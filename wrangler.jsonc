@@ -1,0 +1,67 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "cloudflaretest",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-09-01",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+
+  // Static assets (JS/CSS/images emitted by `next build`) served directly
+  // from Cloudflare's edge, bypassing the Worker entirely — same role
+  // Vercel's CDN plays for static files on the previous deployment target.
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+
+  // Lets the Worker call itself (needed by the OpenNext adapter for some
+  // internal request handling, e.g. background ISR revalidation).
+  "services": [
+    { "binding": "WORKER_SELF_REFERENCE", "service": "cloudflaretest" }
+  ],
+
+  // D1 (SQLite at the edge) backs both app data (auth users/sessions,
+  // bookmarks/saved-articles — see src/db/schema.ts) and the OpenNext
+  // "tag cache" that makes revalidateTag()/revalidatePath() work (see
+  // open-next.config.ts). Same physical database, bound twice under two
+  // names: `DATABASE` is what our own app code (Drizzle) reads, while
+  // `NEXT_TAG_CACHE_D1` is a name the adapter's tag-cache override hard-
+  // codes internally (d1-next-tag-cache.js's BINDING_NAME) — not
+  // something we get to choose, so it's bound separately rather than
+  // renaming our own binding to match.
+  "d1_databases": [
+    {
+      "binding": "DATABASE",
+      "database_name": "cloudflaretest-db",
+      "database_id": "b4f88d60-91d9-4ce1-8bd4-2ccfd4d4a500"
+    },
+    {
+      "binding": "NEXT_TAG_CACHE_D1",
+      "database_name": "cloudflaretest-db",
+      "database_id": "b4f88d60-91d9-4ce1-8bd4-2ccfd4d4a500"
+    }
+  ],
+
+  // KV stores the ISR incremental cache (rendered page/data cache — see
+  // open-next.config.ts's kvIncrementalCache) so regenerated pages survive
+  // Worker restarts/redeploys, matching the previous deployment's
+  // on-demand-ISR behavior. KV over R2 deliberately: R2 requires a card on
+  // file to enable even within its free tier; KV's free tier needs none.
+  // Binding name (NEXT_INC_CACHE_KV) is fixed by the adapter itself, not
+  // arbitrary — see kv-incremental-cache.js's BINDING_NAME.
+  "kv_namespaces": [
+    {
+      "binding": "NEXT_INC_CACHE_KV",
+      "id": "82532f71eaab4e128e4a1757ab19ac49"
+    }
+  ],
+
+  // Cloudflare's native image resizing/optimization, used by next/image
+  // in place of Vercel's Image Optimization API (see next.config.ts).
+  "images": {
+    "binding": "IMAGES"
+  },
+
+  "observability": {
+    "enabled": true
+  }
+}

@@ -1,0 +1,8 @@
+import { getPagesSitemapEntries } from "@/lib/seo/sitemap-entries";
+import { renderUrlSet, XML_HEADERS } from "@/lib/seo/sitemap-xml";
+
+export const revalidate = false;
+
+export async function GET() {
+  return new Response(renderUrlSet(await getPagesSitemapEntries()), { headers: XML_HEADERS });
+}
