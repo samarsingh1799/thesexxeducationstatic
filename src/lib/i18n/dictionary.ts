@@ -6,10 +6,12 @@ import en from "./dictionaries/en.json";
 import hi from "./dictionaries/hi.json";
 import es from "./dictionaries/es.json";
 import fr from "./dictionaries/fr.json";
+import de from "./dictionaries/de.json";
+import pt from "./dictionaries/pt.json";
 
 export type Dictionary = typeof en;
 
-const dictionaries: Record<LocaleCode, Dictionary> = { en, hi, es, fr };
+const dictionaries: Record<LocaleCode, Dictionary> = { en, hi, es, fr, de, pt };
 
 /**
  * Reads the current `[locale]` root param directly via `next/root-params`

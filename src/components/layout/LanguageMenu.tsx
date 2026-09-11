@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { locales } from "@/lib/i18n/locales";
 import { useCurrentLocale } from "@/lib/i18n/useCurrentLocale";
+import { setPreferredLocale } from "@/lib/i18n/languagePreference";
 import { GlobeIcon } from "./icons";
 
 /**
@@ -45,12 +46,16 @@ export function LanguageMenu() {
 
   return (
     <div className="group relative flex">
-      <button type="button" aria-label="Change language" className="flex items-center gap-1.5 text-sm font-medium text-ink transition-colors hover:text-accent">
+      <button
+        type="button"
+        aria-label="Change language"
+        className="flex items-center gap-1.5 text-sm font-medium text-ink transition-colors hover:text-accent"
+      >
         <GlobeIcon className="h-5 w-5" />
         <span className="hidden sm:inline">{current.label}</span>
       </button>
 
-      <div className="invisible absolute right-0 top-full z-50 w-40 rounded-xl border border-border bg-white opacity-0 shadow-lg transition-[visibility,opacity] delay-300 duration-150 group-hover:visible group-hover:opacity-100 group-hover:delay-0 group-focus-within:visible group-focus-within:opacity-100 group-focus-within:delay-0">
+      <div className="invisible absolute right-0 top-full z-50 w-44 rounded-xl border border-border bg-white opacity-0 shadow-lg transition-[visibility,opacity] delay-300 duration-150 group-hover:visible group-hover:opacity-100 group-hover:delay-0 group-focus-within:visible group-focus-within:opacity-100 group-focus-within:delay-0">
         <nav aria-label="Languages" className="flex flex-col p-2">
           {locales.map((locale) => {
             const available = availableCodes === null || availableCodes.includes(locale.code);
@@ -59,12 +64,20 @@ export function LanguageMenu() {
               <Link
                 key={locale.code}
                 href={href}
-                className={`rounded-md px-3 py-2 text-sm hover:bg-accent-soft ${locale.code === current.code ? "font-semibold text-ink" : "text-ink"}`}
+                onClick={() => setPreferredLocale(locale.code)}
+                className={`rounded-md px-3 py-2 text-sm transition-colors hover:bg-accent-soft ${
+                  locale.code === current.code ? "font-semibold text-accent bg-accent-soft/50" : "text-ink"
+                }`}
               >
                 {locale.label}
               </Link>
             ) : (
-              <span key={locale.code} aria-disabled="true" title="Not translated yet" className="rounded-md px-3 py-2 text-sm text-ink-muted/50">
+              <span
+                key={locale.code}
+                aria-disabled="true"
+                title="Not translated yet"
+                className="rounded-md px-3 py-2 text-sm text-ink-muted/50 cursor-not-allowed"
+              >
                 {locale.label}
               </span>
             );

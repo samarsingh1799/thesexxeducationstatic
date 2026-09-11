@@ -30,18 +30,14 @@ function retryDelayMs(attempt: number): number {
 }
 
 function isRetryableStatus(status: number): boolean {
-  return status >= 500 || status === 429;
+  return status >= 500 || status === 429 || status === 403;
 }
 
 /**
- * Retries only idempotent GET requests, and only on a 5xx, a 429, or a
- * network-level failure — this project's shared WordPress hosting
- * returns both transient 500s under load and 429s when a burst of
- * requests (e.g. a deploy's cache-population step, or several rebuilds
- * in a row) lands in a short window. A 429 honors `Retry-After` when the
- * origin sends one, otherwise falls back to the same exponential
- * backoff. Never retries a write (POST/PUT/DELETE): retrying a
- * non-idempotent request after a timeout could silently duplicate it.
+ * Retries only idempotent GET requests, and only on a 5xx, a 429, a 403 (rate limiting),
+ * or a network-level failure — this project's shared WordPress hosting returns both
+ * transient 500s under load and 429s/403s when a burst of requests (e.g. static generation)
+ * lands in a short window.
  */
 async function fetchWithRetry(url: string, init: RequestInit, retryable: boolean): Promise<Response> {
   const maxAttempts = retryable ? RETRYABLE_MAX_ATTEMPTS : 1;
@@ -107,6 +103,7 @@ export async function wpFetch<T>(
       method,
       headers: {
         Accept: "application/json",
+        "User-Agent": "Mozilla/5.0 (compatible; Thesexxeducation/1.0)",
         ...(body ? { "Content-Type": "application/json" } : {}),
         ...headers,
       },

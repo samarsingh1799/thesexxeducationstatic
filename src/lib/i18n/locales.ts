@@ -19,9 +19,11 @@ export const defaultLocale = "en" as const;
 
 export const locales: LocaleConfig[] = [
   { code: "en", label: "English", bcp47: "en" },
-  { code: "hi", label: "हिन्दी", bcp47: "hi" },
   { code: "es", label: "Español", bcp47: "es" },
   { code: "fr", label: "Français", bcp47: "fr" },
+  { code: "de", label: "Deutsch", bcp47: "de" },
+  { code: "pt", label: "Português", bcp47: "pt-BR" },
+  { code: "hi", label: "हिन्दी", bcp47: "hi" },
 ];
 
 export type LocaleCode = (typeof locales)[number]["code"];

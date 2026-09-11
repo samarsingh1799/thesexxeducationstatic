@@ -23,8 +23,10 @@ export async function getTrendingPosts(limit: number, excludeIds: number[] = [])
     .orderBy(desc(postViews.count))
     .limit(limit);
 
-  const posts = await Promise.all(rows.map((row) => getPostById(row.postId)));
-  const ranked = posts.filter((post): post is NonNullable<typeof post> => post !== null);
+  const posts = await Promise.allSettled(rows.map((row) => getPostById(row.postId)));
+  const ranked = posts
+    .filter((res): res is PromiseFulfilledResult<NonNullable<Awaited<ReturnType<typeof getPostById>>>> => res.status === "fulfilled" && res.value !== null)
+    .map((res) => res.value);
   if (ranked.length >= limit) return ranked;
 
   const alreadyShown = new Set([...excludeIds, ...ranked.map((post) => post.id)]);

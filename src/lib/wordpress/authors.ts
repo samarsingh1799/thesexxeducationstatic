@@ -21,18 +21,28 @@ function normalizeAuthor(user: WPUser): Author {
 // already only lists users with at least one published post, which is
 // exactly "authors" for this app's purposes.
 export async function getAllAuthors(): Promise<Author[]> {
-  const result = await wpFetch<WPUser[]>("/wp-json/wp/v2/users", {
-    searchParams: { per_page: 100 },
-    tags: [cacheTags.authorsList()],
-  });
-  return (result?.data ?? []).map(normalizeAuthor);
+  try {
+    const result = await wpFetch<WPUser[]>("/wp-json/wp/v2/users", {
+      searchParams: { per_page: 100 },
+      tags: [cacheTags.authorsList()],
+    });
+    return (result?.data ?? []).map(normalizeAuthor);
+  } catch (err) {
+    console.error("Failed to fetch authors:", err);
+    return [];
+  }
 }
 
 export async function getAuthorBySlug(slug: string): Promise<Author | null> {
-  const result = await wpFetch<WPUser[]>("/wp-json/wp/v2/users", {
-    searchParams: { slug, per_page: 1 },
-    tags: [cacheTags.author(slug), cacheTags.authorsList()],
-  });
-  const user = result?.data?.[0];
-  return user ? normalizeAuthor(user) : null;
+  try {
+    const result = await wpFetch<WPUser[]>("/wp-json/wp/v2/users", {
+      searchParams: { slug, per_page: 1 },
+      tags: [cacheTags.author(slug), cacheTags.authorsList()],
+    });
+    const user = result?.data?.[0];
+    return user ? normalizeAuthor(user) : null;
+  } catch (err) {
+    console.error(`Failed to fetch author by slug (${slug}):`, err);
+    return null;
+  }
 }

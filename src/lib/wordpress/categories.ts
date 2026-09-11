@@ -16,11 +16,16 @@ function normalizeCategory(term: WPCategory): Category {
 }
 
 export async function getAllCategories(): Promise<Category[]> {
-  const result = await wpFetch<WPCategory[]>("/wp-json/wp/v2/categories", {
-    searchParams: { per_page: 100, orderby: "name", order: "asc", hide_empty: true },
-    tags: [cacheTags.categoriesList()],
-  });
-  return (result?.data ?? []).map(normalizeCategory);
+  try {
+    const result = await wpFetch<WPCategory[]>("/wp-json/wp/v2/categories", {
+      searchParams: { per_page: 100, orderby: "name", order: "asc", hide_empty: true },
+      tags: [cacheTags.categoriesList()],
+    });
+    return (result?.data ?? []).map(normalizeCategory);
+  } catch (err) {
+    console.error("Failed to fetch categories:", err);
+    return [];
+  }
 }
 
 function buildHierarchy(categories: Category[]): CategoryWithChildren[] {

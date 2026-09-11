@@ -82,49 +82,64 @@ export async function getPosts(params: GetPostsParams = {}): Promise<{ items: Po
   const categoriesParam = categoryIds && categoryIds.length > 0 ? categoryIds.join(",") : categoryId;
   const excludeParam = excludeIds && excludeIds.length > 0 ? excludeIds.join(",") : undefined;
 
-  const result = await wpFetch<WPPost[]>("/wp-json/wp/v2/posts", {
-    searchParams: {
-      page,
-      per_page: perPage,
-      _embed: 1,
-      categories: categoriesParam,
-      tags: tagId,
-      author: authorId,
-      search,
-      exclude: excludeParam,
-      orderby: "date",
-      order: "desc",
-    },
-    tags: [
-      cacheTags.postsList(),
-      ...(categoryId ? [cacheTags.category(String(categoryId))] : []),
-      ...(tagId ? [cacheTags.tag(String(tagId))] : []),
-    ],
-  });
+  try {
+    const result = await wpFetch<WPPost[]>("/wp-json/wp/v2/posts", {
+      searchParams: {
+        page,
+        per_page: perPage,
+        _embed: 1,
+        categories: categoriesParam,
+        tags: tagId,
+        author: authorId,
+        search,
+        exclude: excludeParam,
+        orderby: "date",
+        order: "desc",
+      },
+      tags: [
+        cacheTags.postsList(),
+        ...(categoryId ? [cacheTags.category(String(categoryId))] : []),
+        ...(tagId ? [cacheTags.tag(String(tagId))] : []),
+      ],
+    });
 
-  return {
-    items: (result?.data ?? []).map(normalizePostSummary),
-    totalPages: result?.totalPages ?? 1,
-    totalItems: result?.totalItems ?? 0,
-  };
+    return {
+      items: (result?.data ?? []).map(normalizePostSummary),
+      totalPages: result?.totalPages ?? 1,
+      totalItems: result?.totalItems ?? 0,
+    };
+  } catch (err) {
+    console.error("Failed to fetch posts:", err);
+    return { items: [], totalPages: 1, totalItems: 0 };
+  }
 }
 
 /** React `cache()`-free by design (this is a plain server module, not a component tree) — callers that need per-request de-dup (metadata + page body both wanting the same post) should wrap this themselves; see app/[locale]/[category]/[slug]/page.tsx. */
 export async function getPostBySlug(slug: string): Promise<Post | null> {
-  const result = await wpFetch<WPPost[]>("/wp-json/wp/v2/posts", {
-    searchParams: { slug, per_page: 1, _embed: 1 },
-    tags: [cacheTags.postsList()],
-  });
-  const post = result?.data?.[0];
-  return post ? normalizePost(post) : null;
+  try {
+    const result = await wpFetch<WPPost[]>("/wp-json/wp/v2/posts", {
+      searchParams: { slug, per_page: 1, _embed: 1 },
+      tags: [cacheTags.postsList()],
+    });
+    const post = result?.data?.[0];
+    return post ? normalizePost(post) : null;
+  } catch (err) {
+    console.error(`Failed to fetch post by slug (${slug}):`, err);
+    return null;
+  }
 }
 
 export async function getPostById(id: number): Promise<Post | null> {
-  const result = await wpFetch<WPPost>(`/wp-json/wp/v2/posts/${id}`, {
-    searchParams: { _embed: 1 },
-    tags: [cacheTags.post(id), cacheTags.postsList()],
-  });
-  return result?.data ? normalizePost(result.data) : null;
+  try {
+    const result = await wpFetch<WPPost>(`/wp-json/wp/v2/posts/${id}`, {
+      searchParams: { _embed: 1 },
+      tags: [cacheTags.post(id), cacheTags.postsList()],
+    });
+    return result?.data ? normalizePost(result.data) : null;
+  } catch (err) {
+    console.error(`Failed to fetch post by id (${id}):`, err);
+    return null;
+  }
 }
 
 /** Every published post's slug + category — the minimum needed to build sitemaps and generateStaticParams without fetching full post bodies. */
@@ -133,17 +148,21 @@ export async function getAllPublishedSlugs(): Promise<Array<{ id: number; slug: 
   const perPage = 100;
   const slugs: Array<{ id: number; slug: string; categorySlug: string | undefined; modifiedAt: string }> = [];
 
-  for (let page = 1; page <= MAX_PAGES; page++) {
-    const result = await wpFetch<WPPost[]>("/wp-json/wp/v2/posts", {
-      searchParams: { page, per_page: perPage, _embed: 1 },
-      tags: [cacheTags.postsList(), cacheTags.sitemap()],
-    });
-    if (!result || result.data.length === 0) break;
+  try {
+    for (let page = 1; page <= MAX_PAGES; page++) {
+      const result = await wpFetch<WPPost[]>("/wp-json/wp/v2/posts", {
+        searchParams: { page, per_page: perPage, _embed: 1 },
+        tags: [cacheTags.postsList(), cacheTags.sitemap()],
+      });
+      if (!result || result.data.length === 0) break;
 
-    for (const post of result.data) {
-      slugs.push({ id: post.id, slug: post.slug, categorySlug: pickCategoryTerm(post._embedded)?.slug, modifiedAt: `${post.modified_gmt}Z` });
+      for (const post of result.data) {
+        slugs.push({ id: post.id, slug: post.slug, categorySlug: pickCategoryTerm(post._embedded)?.slug, modifiedAt: `${post.modified_gmt}Z` });
+      }
+      if (page >= result.totalPages) break;
     }
-    if (page >= result.totalPages) break;
+  } catch (err) {
+    console.error("Failed to fetch published slugs:", err);
   }
 
   return slugs;
