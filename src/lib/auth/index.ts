@@ -44,6 +44,19 @@ export function createAuth(env?: CloudflareEnv, cf?: IncomingRequestCfProperties
             await sendVerificationEmail(user.email, url);
           },
         },
+        // "Continue with Google" — better-auth's own callback convention,
+        // {BETTER_AUTH_URL}/api/auth/callback/google, is what must be
+        // registered as the Authorized redirect URI in Google Cloud
+        // Console (Credentials → the OAuth client). Leaving the env vars
+        // unset doesn't crash anything — better-auth just logs a
+        // "missing clientId" warning and the button's flow fails at the
+        // Google redirect step.
+        socialProviders: {
+          google: {
+            clientId: env?.GOOGLE_CLIENT_ID ?? "",
+            clientSecret: env?.GOOGLE_CLIENT_SECRET ?? "",
+          },
+        },
         session: {
           // 7-day session lifetime, refreshed on activity — long enough
           // a returning reader doesn't get logged out between visits,

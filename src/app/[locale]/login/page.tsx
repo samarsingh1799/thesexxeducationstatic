@@ -8,9 +8,9 @@ export const metadata: Metadata = { title: "Sign in", robots: { index: false, fo
 export default async function LoginPage() {
   const dictionary = await getDictionary();
   return (
-    <div className="mx-auto max-w-sm px-4 py-16">
+    <div className="mx-auto max-w-md px-4 py-16">
       <h1 className="text-2xl font-bold text-ink">{dictionary.signIn}</h1>
-      <div className="mt-6">
+      <div className="mt-8">
         {/* SignInForm reads ?redirect= via useSearchParams, which forces a Suspense boundary during static prerendering. */}
         <Suspense fallback={null}>
           <SignInForm dictionary={dictionary} />

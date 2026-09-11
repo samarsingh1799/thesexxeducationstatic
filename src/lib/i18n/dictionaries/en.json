@@ -59,5 +59,15 @@
   "powerUpYourInbox": "Power up your inbox",
   "newsletterBody": "Get the latest articles, delivered straight to your inbox.",
   "enterYourEmail": "Enter your email",
-  "articlesInCategory": "Articles in {category}."
+  "articlesInCategory": "Articles in {category}.",
+  "articlesTagged": "Articles tagged {tag}.",
+  "articlesByAuthor": "Articles by {author}.",
+  "comments": "Comments",
+  "noCommentsYet": "No comments yet — be the first to comment.",
+  "signInToComment": "Sign in to join the conversation.",
+  "writeCommentPlaceholder": "Share your thoughts…",
+  "postComment": "Post comment",
+  "postingComment": "Posting…",
+  "commentError": "Something went wrong. Please try again.",
+  "categoryNames": {}
 }

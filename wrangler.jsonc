@@ -5,6 +5,19 @@
   "compatibility_date": "2026-09-01",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
 
+  // Non-secret runtime config. NEXT_PUBLIC_SITE_URL must ALSO be present at
+  // `next build` time (see .env.production.local) — that's what actually
+  // gets inlined into the client JS bundle; this copy is what the Worker
+  // reads at request time (e.g. lib/seo/site-config.ts's process.env read,
+  // via OpenNext's env polyfill). BETTER_AUTH_URL is read only at request
+  // time (lib/auth/index.ts), so this is its sole source in production.
+  // Update both this block and .env.production.local together if the
+  // production domain ever changes, then redeploy.
+  "vars": {
+    "NEXT_PUBLIC_SITE_URL": "https://www.thesexxeducation.com",
+    "BETTER_AUTH_URL": "https://www.thesexxeducation.com"
+  },
+
   // Static assets (JS/CSS/images emitted by `next build`) served directly
   // from Cloudflare's edge, bypassing the Worker entirely — same role
   // Vercel's CDN plays for static files on the previous deployment target.

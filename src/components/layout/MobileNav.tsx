@@ -10,7 +10,7 @@ import { useCurrentLocale } from "@/lib/i18n/useCurrentLocale";
 import { MenuIcon, CloseIcon, SearchIcon, ChevronDownIcon } from "./icons";
 import { SearchModal } from "./SearchModal";
 
-export function MobileNav({ categories }: { categories: CategoryWithChildren[] }) {
+export function MobileNav({ categories, latestLabel }: { categories: CategoryWithChildren[]; latestLabel: string }) {
   const [isMounted, setIsMounted] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -113,6 +113,13 @@ export function MobileNav({ categories }: { categories: CategoryWithChildren[] }
                 className="flex items-center rounded-xl px-4 py-3 text-base font-semibold text-ink hover:bg-gray-50 transition-colors"
               >
                 Home
+              </Link>
+              <Link
+                href={`/${locale.code}/latest`}
+                onClick={closeMenu}
+                className="flex items-center rounded-xl px-4 py-3 text-base font-semibold text-ink hover:bg-gray-50 transition-colors"
+              >
+                {latestLabel}
               </Link>
               <button
                 type="button"

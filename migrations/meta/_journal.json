@@ -15,6 +15,13 @@
       "when": 1789121323860,
       "tag": "0001_mixed_white_queen",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1789145702011,
+      "tag": "0002_youthful_starhawk",
+      "breakpoints": true
     }
   ]
 }

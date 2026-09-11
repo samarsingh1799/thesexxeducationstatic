@@ -57,6 +57,7 @@ export async function getPagesSitemapEntries(): Promise<SitemapUrlEntry[]> {
 
     for (const locale of locales) {
       entries.push({ loc: getCanonicalUrl(`/${locale.code}`), changeFrequency: "daily", priority: 1.0 });
+      entries.push({ loc: getCanonicalUrl(`/${locale.code}/latest`), changeFrequency: "daily", priority: 0.6 });
       for (const category of categories) {
         entries.push({ loc: getCanonicalUrl(`/${locale.code}/category/${category.slug}`), changeFrequency: "daily", priority: 0.5 });
       }

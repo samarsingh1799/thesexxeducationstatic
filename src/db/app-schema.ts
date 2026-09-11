@@ -92,6 +92,31 @@ export const postViews = sqliteTable("post_views", {
   count: integer("count").notNull().default(0),
 });
 
+/**
+ * Reader comments — app-owned (D1), never mirrored into WordPress, same
+ * pattern as savedArticles/likedArticles. Keyed only by `postId`, not by
+ * locale: comments are one shared discussion thread per underlying
+ * WordPress post regardless of which translation a reader is viewing it
+ * in — locale-siloing the thread would leave most non-English locales
+ * permanently empty. Sign-in is required to post (enforced in
+ * api/comments/[postId]/route.ts, never client-side only); reading the
+ * list requires no auth. `authorName` is denormalized at write time from
+ * the session (same convention as savedArticles.title) so the list
+ * renders without joining the auth `users` table.
+ */
+export const comments = sqliteTable(
+  "comments",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id").notNull(),
+    postId: integer("post_id").notNull(),
+    authorName: text("author_name").notNull(),
+    content: text("content").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+  },
+  (table) => [index("comments_post_id_idx").on(table.postId), index("comments_user_id_idx").on(table.userId)]
+);
+
 export const appSchema = {
   savedArticles,
   readingHistory,
@@ -99,4 +124,5 @@ export const appSchema = {
   userPreferences,
   likedArticles,
   postViews,
+  comments,
 };

@@ -1,5 +1,6 @@
 import { wpFetch } from "./client";
 import { locales, defaultLocale } from "@/lib/i18n/locales";
+import { getLocalizedCategoryName } from "@/lib/i18n/categoryNames";
 import type { Post, PostSummary } from "@/types/content";
 import { getPostBySlug } from "./posts";
 
@@ -50,11 +51,15 @@ export async function getAvailableTranslationLocales(postId: number): Promise<st
 /**
  * The English `Post` translated into one locale — same shape, so every
  * component that already renders a `Post` needs zero changes to render a
- * translated one. Only title/excerpt/content/SEO fields are translated;
- * author, category, dates and the featured image stay as-is (this
- * project's v1 scope, matching the same simplification used elsewhere).
- * Returns null (never partial/English content) whenever a translation
- * doesn't exist yet — the caller 404s, exactly like any other
+ * translated one. Only title/excerpt/content/SEO fields come from the
+ * stored translation; author, dates and the featured image stay as-is
+ * (this project's v1 scope, matching the same simplification used
+ * elsewhere) — but the category's display *name* is also localized here,
+ * via the hand-maintained map in lib/i18n/categoryNames.ts, since
+ * WordPress itself has no mechanism to translate taxonomy names the way
+ * it does post content. The category's id/slug/description/count are
+ * untouched. Returns null (never partial/English content) whenever a
+ * translation doesn't exist yet — the caller 404s, exactly like any other
  * not-yet-published post.
  */
 export async function getTranslatedPost(locale: string, slug: string): Promise<Post | null> {
@@ -71,6 +76,7 @@ export async function getTranslatedPost(locale: string, slug: string): Promise<P
     title: translation.title,
     excerpt: translation.excerpt,
     contentHtml: translation.content,
+    category: post.category ? { ...post.category, name: getLocalizedCategoryName(post.category, locale) } : undefined,
     seo: {
       title: translation.seoTitle ?? undefined,
       description: translation.seoDescription ?? undefined,
@@ -93,6 +99,13 @@ export async function getTranslatedPostSummaries(posts: PostSummary[], locale: s
   return posts.flatMap((post, index) => {
     const result = results[index];
     if (result.status !== "fulfilled" || !result.value) return [];
-    return [{ ...post, title: result.value.title, excerpt: result.value.excerpt }];
+    return [
+      {
+        ...post,
+        title: result.value.title,
+        excerpt: result.value.excerpt,
+        category: post.category ? { ...post.category, name: getLocalizedCategoryName(post.category, locale) } : undefined,
+      },
+    ];
   });
 }

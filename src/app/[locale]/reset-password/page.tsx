@@ -8,9 +8,9 @@ export const metadata: Metadata = { title: "Reset password", robots: { index: fa
 export default async function ResetPasswordPage() {
   const dictionary = await getDictionary();
   return (
-    <div className="mx-auto max-w-sm px-4 py-16">
+    <div className="mx-auto max-w-md px-4 py-16">
       <h1 className="text-2xl font-bold text-ink">{dictionary.resetPassword}</h1>
-      <div className="mt-6">
+      <div className="mt-8">
         <Suspense fallback={null}>
           <ResetPasswordForm dictionary={dictionary} />
         </Suspense>

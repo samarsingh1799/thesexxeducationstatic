@@ -1,47 +1,59 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { getCategoryBySlug, getCategoryHierarchy, getDescendantCategoryIds } from "@/lib/wordpress/categories";
 import { getPosts } from "@/lib/wordpress/posts";
 import { getTranslatedPostSummaries } from "@/lib/wordpress/languages";
 import { getDictionary } from "@/lib/i18n/dictionary";
 import { isSupportedLocale } from "@/lib/i18n/locales";
+import { localizeCategoryName } from "@/lib/i18n/categoryNames";
 import { buildPageMetadata } from "@/lib/seo/metadata";
 import { getTranslationUrls } from "@/lib/seo/canonical";
 import { getBreadcrumbSchema } from "@/lib/seo/schema";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
-import { ArticleCard } from "@/components/article/ArticleCard";
+import { PaginatedPostGrid } from "@/components/article/PaginatedPostGrid";
+import { PostGrid } from "@/components/article/PostGrid";
 import { Pagination } from "@/components/ui/Pagination";
+import { PaginationNav } from "@/components/ui/PaginationNav";
 import { AdSlot } from "@/components/ads/AdSlot";
 import type { Category } from "@/types/content";
 
-export const dynamic = "force-dynamic";
+// On-demand ISR, matching home/article (see those routes' comments): page 1
+// is rendered and cached at the edge, invalidated only by the WordPress
+// webhook. `searchParams` (pagination) is deliberately never read here —
+// doing so would force this whole route to render dynamically on every
+// request regardless of this config, per Next's own docs. Pagination
+// beyond page 1 is handled client-side by PaginatedPostGrid instead.
+export const revalidate = false;
+export const dynamicParams = true;
+
+export async function generateStaticParams() {
+  return [];
+}
 
 const PER_PAGE = 13;
 
-type RouteParams = {
-  params: Promise<{ locale: string; slug: string }>;
-  searchParams: Promise<{ page?: string }>;
-};
+type RouteParams = { params: Promise<{ locale: string; slug: string }> };
 
 export async function generateMetadata({ params }: RouteParams): Promise<Metadata> {
   const { locale, slug } = await params;
   const category = await getCategoryBySlug(slug);
   if (!category) return { title: "Category not found", robots: { index: false, follow: true } };
 
+  const dictionary = await getDictionary();
+  const categoryName = localizeCategoryName(category, dictionary);
   return buildPageMetadata({
-    title: category.name,
-    description: category.description || `Articles in ${category.name}.`,
+    title: categoryName,
+    description: category.description || dictionary.articlesInCategory.replace("{category}", categoryName),
     path: `/${locale}/category/${slug}`,
     translations: getTranslationUrls(`/category/${slug}`),
   });
 }
 
-export default async function CategoryPage({ params, searchParams }: RouteParams) {
+export default async function CategoryPage({ params }: RouteParams) {
   const { locale, slug } = await params;
-  const { page: pageParam } = await searchParams;
-  const page = Math.max(1, Number(pageParam) || 1);
 
   if (!isSupportedLocale(locale)) notFound();
 
@@ -53,7 +65,7 @@ export default async function CategoryPage({ params, searchParams }: RouteParams
 
   const [dictionary, { items: englishPosts, totalPages, totalItems }] = await Promise.all([
     getDictionary(),
-    getPosts({ categoryIds, page, perPage: PER_PAGE }),
+    getPosts({ categoryIds, page: 1, perPage: PER_PAGE }),
   ]);
 
   const posts = await getTranslatedPostSummaries(englishPosts, locale);
@@ -63,12 +75,13 @@ export default async function CategoryPage({ params, searchParams }: RouteParams
     : undefined;
   const children = hierarchy.find((c) => c.id === category.id)?.children ?? [];
 
-  const [featured, ...rest] = posts;
+  const categoryName = localizeCategoryName(category, dictionary);
+  const parentName = parent ? localizeCategoryName(parent, dictionary) : undefined;
 
   const breadcrumbItems = [
     { name: dictionary.home, href: `/${locale}` },
-    ...(parent ? [{ name: parent.name, href: `/${locale}/category/${parent.slug}` }] : []),
-    { name: category.name, href: `/${locale}/category/${slug}` },
+    ...(parent ? [{ name: parentName!, href: `/${locale}/category/${parent.slug}` }] : []),
+    { name: categoryName, href: `/${locale}/category/${slug}` },
   ];
 
   return (
@@ -77,8 +90,8 @@ export default async function CategoryPage({ params, searchParams }: RouteParams
       <Breadcrumbs items={breadcrumbItems} />
 
       <div className="mt-4 border-b border-border pb-8">
-        <p className="text-xs font-semibold uppercase tracking-wide text-accent">Category</p>
-        <h1 className="mt-1 text-3xl font-bold text-ink md:text-4xl">{category.name}</h1>
+        <p className="text-xs font-semibold uppercase tracking-wide text-accent">{dictionary.category}</p>
+        <h1 className="mt-1 text-3xl font-bold text-ink md:text-4xl">{categoryName}</h1>
         <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-ink-muted">
           <span>
             {totalItems} {totalItems === 1 ? "article" : "articles"}
@@ -99,34 +112,56 @@ export default async function CategoryPage({ params, searchParams }: RouteParams
                 href={`/${locale}/category/${child.slug}`}
                 className="rounded-full bg-black px-4 py-1.5 text-sm font-medium text-white transition-colors hover:text-accent border border-white/10"
               >
-                {child.name}
+                {localizeCategoryName(child, dictionary)}
               </Link>
             ))}
           </div>
         )}
       </div>
 
-      {posts.length === 0 ? (
-        <p className="mt-8 text-ink-muted">{dictionary.noArticles}</p>
-      ) : (
-        <>
-          {page === 1 && featured && (
-            <div className="mt-8 border-b border-border pb-8">
-              <ArticleCard post={featured} variant="hero" locale={locale} />
-            </div>
-          )}
-
-          <div className="mt-8 grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
-            {(page === 1 ? rest : posts).map((post) => (
-              <ArticleCard key={post.slug} post={post} variant="compact" locale={locale} />
-            ))}
-          </div>
-        </>
-      )}
+      {/* Both PaginatedPostGrid and Pagination read useSearchParams() (client-
+          side) — Next.js requires a Suspense boundary around any such
+          component on a statically-prerendered route, or the whole route
+          "bails out" to client-side rendering, which fails outright under
+          the OpenNext/Cloudflare ISR path (see login/page.tsx's own comment
+          for the same requirement, applied to SignInForm there). The
+          fallback is the REAL page-1 content, rendered directly with no
+          client dependency — that's what actually ends up in the cached/
+          ISR'd HTML; PaginatedPostGrid/Pagination only run after hydration,
+          and render identically for the (overwhelmingly common) page-1 case. */}
+      <Suspense fallback={<PostGrid items={posts} locale={locale} showHero noArticlesLabel={dictionary.noArticles} />}>
+        <PaginatedPostGrid
+          type="category"
+          slug={category.slug}
+          locale={locale}
+          initialItems={posts}
+          showHeroOnFirstPage
+          noArticlesLabel={dictionary.noArticles}
+        />
+      </Suspense>
 
       <AdSlot slotId={`category-${category.slug}`} label="Advertisement" className="mt-10" />
 
-      <Pagination basePath={`/${locale}/category/${category.slug}`} page={page} totalPages={totalPages} locale={locale} />
+      <Suspense
+        fallback={
+          <PaginationNav
+            basePath={`/${locale}/category/${category.slug}`}
+            page={1}
+            totalPages={totalPages}
+            previousLabel={dictionary.previous}
+            nextLabel={dictionary.next}
+            pageOfTemplate={dictionary.pageOf}
+          />
+        }
+      >
+        <Pagination
+          basePath={`/${locale}/category/${category.slug}`}
+          totalPages={totalPages}
+          previousLabel={dictionary.previous}
+          nextLabel={dictionary.next}
+          pageOfTemplate={dictionary.pageOf}
+        />
+      </Suspense>
     </div>
   );
 }

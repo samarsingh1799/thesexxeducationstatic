@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { locale as getRootLocale } from "next/root-params";
 import { getDictionary } from "@/lib/i18n/dictionary";
+import { localizeCategoryTree } from "@/lib/i18n/categoryNames";
 import { getCategoryHierarchy } from "@/lib/wordpress/categories";
 import { siteConfig } from "@/lib/seo/site-config";
 import { LanguageMenu } from "./LanguageMenu";
@@ -11,7 +12,11 @@ import { DateTimeBadge } from "./DateTimeBadge";
 import { SearchButton } from "./SearchButton";
 
 export async function SiteHeader() {
-  const [locale, dictionary, categories] = await Promise.all([getRootLocale(), getDictionary(), getCategoryHierarchy()]);
+  const [locale, dictionary, rawCategories] = await Promise.all([getRootLocale(), getDictionary(), getCategoryHierarchy()]);
+  // WordPress category names are always English — see lib/i18n/categoryNames.ts
+  // for why they need this separate, hand-maintained translation map rather
+  // than the post-translation mechanism the rest of the site uses.
+  const categories = localizeCategoryTree(rawCategories, dictionary);
 
   return (
     <header className="sticky top-0 z-40 bg-white">
@@ -19,7 +24,7 @@ export async function SiteHeader() {
       <div className="border-b border-border">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-3 sm:px-6 py-2.5 sm:py-3">
           <div className="flex flex-1 items-center justify-start gap-4">
-            <MobileNav categories={categories} />
+            <MobileNav categories={categories} latestLabel={dictionary.latestBreadcrumb} />
             <DateTimeBadge className="hidden text-sm text-ink-muted lg:block" />
           </div>
 
@@ -46,6 +51,12 @@ export async function SiteHeader() {
             aria-label="Quick categories"
             className="flex items-center gap-1.5 overflow-x-auto px-3 py-1.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           >
+            <Link
+              href={`/${locale}/latest`}
+              className="shrink-0 whitespace-nowrap rounded-full border border-white/20 bg-white/5 px-2.5 py-0.5 text-[11px] font-medium text-white transition-colors hover:border-accent hover:text-accent"
+            >
+              {dictionary.latestBreadcrumb}
+            </Link>
             {categories.slice(0, 10).map((category) => (
               <Link
                 key={category.slug}
@@ -62,7 +73,7 @@ export async function SiteHeader() {
       {/* Section-navigation row — desktop only; mobile reaches the same links through the drawer MobileNav opens above. */}
       <div className="hidden border-b border-white/10 bg-black lg:block">
         <div className="mx-auto max-w-7xl px-6 py-3">
-          <DesktopNav categories={categories} />
+          <DesktopNav categories={categories} latestLabel={dictionary.latestBreadcrumb} />
         </div>
       </div>
     </header>

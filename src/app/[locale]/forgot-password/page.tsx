@@ -7,9 +7,9 @@ export const metadata: Metadata = { title: "Forgot password", robots: { index: f
 export default async function ForgotPasswordPage() {
   const dictionary = await getDictionary();
   return (
-    <div className="mx-auto max-w-sm px-4 py-16">
+    <div className="mx-auto max-w-md px-4 py-16">
       <h1 className="text-2xl font-bold text-ink">{dictionary.forgotPassword}</h1>
-      <div className="mt-6">
+      <div className="mt-8">
         <ForgotPasswordForm dictionary={dictionary} />
       </div>
     </div>

@@ -3,11 +3,13 @@ import Image from "next/image";
 import { locale as getRootLocale } from "next/root-params";
 import { siteConfig } from "@/lib/seo/site-config";
 import { getAllCategories } from "@/lib/wordpress/categories";
+import { getDictionary } from "@/lib/i18n/dictionary";
+import { localizeCategoryName } from "@/lib/i18n/categoryNames";
 
 const MAX_FOOTER_CATEGORIES = 6;
 
 export async function SiteFooter() {
-  const [locale, allCategories] = await Promise.all([getRootLocale(), getAllCategories()]);
+  const [locale, allCategories, dictionary] = await Promise.all([getRootLocale(), getAllCategories(), getDictionary()]);
   const categories = allCategories.slice(0, MAX_FOOTER_CATEGORIES);
 
   return (
@@ -19,7 +21,7 @@ export async function SiteFooter() {
               <Image src="/logo-mark.png" alt="" width={20} height={20} className="h-5 w-5 object-contain" />
               <span className="font-serif text-xl font-bold tracking-tight text-ink">{siteConfig.name}</span>
             </Link>
-            <p className="mt-3 max-w-xs">{siteConfig.description}</p>
+            <p className="mt-3 max-w-xs">{dictionary.homeDescription}</p>
             <p className="mt-1 max-w-xs">Educational Sexual Health &amp; Wellness</p>
           </div>
 
@@ -30,7 +32,7 @@ export async function SiteFooter() {
                 {categories.map((category) => (
                   <li key={category.slug}>
                     <Link href={`/${locale}/category/${category.slug}`} className="hover:text-accent hover:underline">
-                      {category.name}
+                      {localizeCategoryName(category, dictionary)}
                     </Link>
                   </li>
                 ))}

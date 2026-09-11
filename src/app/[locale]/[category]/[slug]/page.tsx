@@ -29,6 +29,7 @@ import { SaveArticleButton } from "@/components/article/SaveArticleButton";
 import { LikeArticleButton } from "@/components/article/LikeArticleButton";
 import { ShareButtons } from "@/components/article/ShareButtons";
 import { FontSizeControl } from "@/components/article/FontSizeControl";
+import { CommentsSection } from "@/components/article/CommentsSection";
 import { AdSlot } from "@/components/ads/AdSlot";
 
 export const revalidate = false;
@@ -198,6 +199,22 @@ export default async function ArticlePage({ params }: RouteParams) {
               <AuthorBio author={post.author} locale={locale} />
             </div>
           </section>
+
+          <CommentsSection
+            postId={post.id}
+            locale={locale}
+            articlePath={canonicalPath}
+            dictionary={{
+              comments: dictionary.comments,
+              noCommentsYet: dictionary.noCommentsYet,
+              signInToComment: dictionary.signInToComment,
+              signIn: dictionary.signIn,
+              writeCommentPlaceholder: dictionary.writeCommentPlaceholder,
+              postComment: dictionary.postComment,
+              postingComment: dictionary.postingComment,
+              commentError: dictionary.commentError,
+            }}
+          />
         </article>
 
         {/* Right column: Sticky Trending Sidebar */}

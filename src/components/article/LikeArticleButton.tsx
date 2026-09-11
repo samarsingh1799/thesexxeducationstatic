@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { FaRegHeart, FaHeart } from "react-icons/fa6";
 import { authClient } from "@/lib/auth/client";
+import { buildAuthModalUrl } from "@/lib/auth/authModal";
 
 type Props = {
   postId: number;
@@ -15,8 +16,9 @@ type Props = {
 
 /**
  * Same self-contained client-island shape as SaveArticleButton, including
- * rendering for guests and redirecting to sign-in (with a way back to this
- * article) on click rather than hiding entirely.
+ * rendering for guests and opening the sign-in modal in place (with a way
+ * back to this article, once signed in) on click, rather than hiding
+ * entirely or navigating away to a full /login page.
  */
 export function LikeArticleButton({ postId, slug, categorySlug, locale, title }: Props) {
   const { data: session, isPending } = authClient.useSession();
@@ -40,7 +42,7 @@ export function LikeArticleButton({ postId, slug, categorySlug, locale, title }:
 
   async function toggle() {
     if (!session) {
-      router.push(`/${locale}/login?redirect=${encodeURIComponent(`/${locale}/${categorySlug ?? "article"}/${slug}`)}`);
+      router.push(buildAuthModalUrl(`/${locale}/${categorySlug ?? "article"}/${slug}`, "like"), { scroll: false });
       return;
     }
 

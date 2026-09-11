@@ -1,84 +1,163 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useState, type FormEvent } from "react";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import Link from "next/link";
 import { authClient } from "@/lib/auth/client";
 import { useCurrentLocale } from "@/lib/i18n/useCurrentLocale";
+import { SocialSignInButtons } from "@/components/auth/SocialSignInButtons";
 import type { Dictionary } from "@/lib/i18n/dictionary";
 
-export function SignInForm({ dictionary }: { dictionary: Dictionary }) {
+type Status = "idle" | "submitting" | "error";
+
+const AUTH_ERROR_MESSAGES: Record<string, string> = {
+  oauth_failed: "Something went wrong while signing you in. Please try again.",
+  oauth_cancelled: "Sign-in was cancelled.",
+  email_exists:
+    "An account already exists for this email. Sign in below with your usual method, then connect this provider from Settings.",
+};
+
+export function SignInForm({
+  dictionary,
+  onSignupClick,
+}: {
+  dictionary?: Dictionary;
+  onSignupClick?: () => void;
+} = {}) {
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const locale = useCurrentLocale();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const authError = searchParams.get("authError");
 
-  async function handleSubmit(event: React.FormEvent) {
+  const [status, setStatus] = useState<Status>("idle");
+  const [error, setError] = useState<string | null>(
+    authError ? (AUTH_ERROR_MESSAGES[authError] ?? null) : null
+  );
+
+  const redirectCandidate = searchParams.get("redirect");
+  const fallbackRedirect = `/${locale.code}/account`;
+  const redirectPath =
+    redirectCandidate && redirectCandidate.startsWith(`/${locale.code}`)
+      ? redirectCandidate
+      : fallbackRedirect;
+  const action = searchParams.get("action");
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setStatus("submitting");
     setError(null);
-    setIsSubmitting(true);
 
-    const { error: signInError } = await authClient.signIn.email({ email, password });
-    setIsSubmitting(false);
+    const form = event.currentTarget;
+    const data = new FormData(form);
+    const email = data.get("email") as string;
+    const password = data.get("password") as string;
+    const rememberMe = data.get("rememberMe") === "on";
 
-    if (signInError) {
-      setError(signInError.message ?? "Invalid email or password.");
-      return;
+    try {
+      const { error: signInError } = await authClient.signIn.email({
+        email,
+        password,
+        rememberMe,
+      });
+
+      if (signInError) {
+        setError(signInError.message ?? "Invalid email or password.");
+        setStatus("error");
+        return;
+      }
+
+      router.push(redirectPath);
+      router.refresh();
+    } catch {
+      setError("Something went wrong. Please try again.");
+      setStatus("error");
     }
-    const redirect = searchParams.get("redirect");
-    router.push(redirect && redirect.startsWith(`/${locale.code}`) ? redirect : `/${locale.code}/account`);
-    router.refresh();
   }
 
+  const forgotPasswordHref = `/${locale.code}/forgot-password`;
+  const registerHref = `/${locale.code}/register`;
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      {error && <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
-      <div>
-        <label htmlFor="email" className="block text-sm font-medium text-ink">
-          {dictionary.email}
+    <div className="space-y-5">
+      <SocialSignInButtons redirectPath={redirectPath} action={action} />
+
+      <div className="flex items-center gap-3 text-xs uppercase tracking-wide text-ink-muted">
+        <span className="h-px flex-1 bg-border" />
+        Or
+        <span className="h-px flex-1 bg-border" />
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+        <div>
+          <label htmlFor="email" className="text-sm font-medium text-ink">
+            {dictionary?.email ?? "Email"}
+          </label>
+          <input
+            id="email"
+            name="email"
+            type="email"
+            required
+            autoComplete="email"
+            className="mt-1 w-full rounded-md border border-border px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+          />
+        </div>
+
+        <div>
+          <div className="flex items-center justify-between">
+            <label htmlFor="password" className="text-sm font-medium text-ink">
+              {dictionary?.password ?? "Password"}
+            </label>
+            <Link href={forgotPasswordHref} className="text-sm text-accent hover:underline">
+              {dictionary?.forgotPassword ?? "Forgot password?"}
+            </Link>
+          </div>
+          <input
+            id="password"
+            name="password"
+            type="password"
+            required
+            autoComplete="current-password"
+            className="mt-1 w-full rounded-md border border-border px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+          />
+        </div>
+
+        <label className="flex items-center gap-2 text-sm text-ink-muted cursor-pointer">
+          <input type="checkbox" name="rememberMe" className="h-4 w-4 rounded border-border text-ink" />
+          Remember me
         </label>
-        <input
-          id="email"
-          type="email"
-          required
-          autoComplete="email"
-          value={email}
-          onChange={(event) => setEmail(event.target.value)}
-          className="mt-1 w-full rounded-md border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-        />
-      </div>
-      <div>
-        <label htmlFor="password" className="block text-sm font-medium text-ink">
-          {dictionary.password}
-        </label>
-        <input
-          id="password"
-          type="password"
-          required
-          autoComplete="current-password"
-          value={password}
-          onChange={(event) => setPassword(event.target.value)}
-          className="mt-1 w-full rounded-md border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-        />
-      </div>
-      <button
-        type="submit"
-        disabled={isSubmitting}
-        className="w-full rounded-md bg-ink px-4 py-2 text-sm font-semibold text-white hover:bg-black disabled:opacity-50"
-      >
-        {dictionary.signIn}
-      </button>
-      <div className="flex justify-between text-sm">
-        <Link href={`/${locale.code}/forgot-password`} className="text-ink-muted hover:text-accent">
-          {dictionary.forgotPassword}
-        </Link>
-        <Link href={`/${locale.code}/register`} className="text-ink-muted hover:text-accent">
-          {dictionary.createAccount}
-        </Link>
-      </div>
-    </form>
+
+        {error && (
+          <p role="alert" aria-live="polite" className="text-sm text-red-600">
+            {error}
+          </p>
+        )}
+
+        <button
+          type="submit"
+          disabled={status === "submitting"}
+          className="w-full rounded-md bg-ink px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-black disabled:opacity-50"
+        >
+          {status === "submitting" ? "Signing in…" : (dictionary?.signIn ?? "Sign in")}
+        </button>
+
+        <p className="text-center text-sm text-ink-muted">
+          Don&rsquo;t have an account?{" "}
+          {onSignupClick ? (
+            <button
+              type="button"
+              onClick={onSignupClick}
+              className="font-medium text-accent hover:underline"
+            >
+              {dictionary?.signUp ?? "Sign up"}
+            </button>
+          ) : (
+            <Link href={registerHref} className="font-medium text-accent hover:underline">
+              {dictionary?.signUp ?? "Sign up"}
+            </Link>
+          )}
+        </p>
+      </form>
+    </div>
   );
 }

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import Script from "next/script";
 import dynamic from "next/dynamic";
@@ -8,6 +9,7 @@ import { siteConfig } from "@/lib/seo/site-config";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { SiteFooter } from "@/components/layout/SiteFooter";
 import { ScrollToTop } from "@/components/layout/ScrollToTop";
+import { AuthModal } from "@/components/auth/AuthModal";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { getOrganizationSchema, getWebsiteSchema } from "@/lib/seo/schema";
 import "../globals.css";
@@ -92,6 +94,9 @@ export default async function LocaleLayout({
         <SiteFooter />
         <FeedbackWidget />
         <ScrollToTop />
+        <Suspense fallback={null}>
+          <AuthModal />
+        </Suspense>
       </body>
     </html>
   );

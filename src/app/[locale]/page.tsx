@@ -2,13 +2,13 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getPosts } from "@/lib/wordpress/posts";
-import { getCategoryHierarchy } from "@/lib/wordpress/categories";
+import { getCategoryHierarchy, getDescendantCategoryIds } from "@/lib/wordpress/categories";
 import { getAllAuthors } from "@/lib/wordpress/authors";
 import { getTranslatedPostSummaries } from "@/lib/wordpress/languages";
 import { getTrendingPosts } from "@/lib/wordpress/trending";
 import { getDictionary } from "@/lib/i18n/dictionary";
 import { isSupportedLocale } from "@/lib/i18n/locales";
-import type { Category } from "@/types/content";
+import { localizeCategoryTree } from "@/lib/i18n/categoryNames";
 import { buildPageMetadata } from "@/lib/seo/metadata";
 import { getTranslationUrls } from "@/lib/seo/canonical";
 import { siteConfig } from "@/lib/seo/site-config";
@@ -32,9 +32,10 @@ type RouteParams = { params: Promise<{ locale: string }> };
 
 export async function generateMetadata({ params }: RouteParams): Promise<Metadata> {
   const { locale } = await params;
+  const dictionary = await getDictionary();
   return buildPageMetadata({
     title: siteConfig.name,
-    description: siteConfig.description,
+    description: dictionary.homeDescription,
     path: `/${locale}`,
     translations: getTranslationUrls("/"),
   });
@@ -44,13 +45,20 @@ export default async function HomePage({ params }: RouteParams) {
   const { locale } = await params;
   if (!isSupportedLocale(locale)) notFound();
 
-  const [dictionary, { items: englishPosts }, categoryTree, authors] = await Promise.all([
+  const MAX_CATEGORY_SECTIONS = 6;
+  const POSTS_PER_CATEGORY_SECTION = 5;
+
+  const [dictionary, { items: englishPosts }, rawCategoryTree, authors] = await Promise.all([
     getDictionary(),
-    getPosts({ perPage: 35 }),
+    getPosts({ perPage: 14 }),
     getCategoryHierarchy(),
     getAllAuthors(),
   ]);
   const posts = await getTranslatedPostSummaries(englishPosts, locale);
+  // WordPress category names are always English — see lib/i18n/categoryNames.ts.
+  // Every downstream use below (nav pills, CategoryShowcase/CategorySpotlight,
+  // and their id/slug-based lookups) is unaffected by renaming `.name` here.
+  const categoryTree = localizeCategoryTree(rawCategoryTree, dictionary);
 
   if (posts.length === 0) {
     return (
@@ -64,24 +72,56 @@ export default async function HomePage({ params }: RouteParams) {
   const heroSlides = posts.slice(0, 3);
   const sidebarLatest = posts.slice(3, 8);
   const currentPosts = posts.slice(8, 14);
-  const remainingPosts = posts.slice(14);
 
   const shownIds = [...heroSlides, ...sidebarLatest, ...currentPosts].map((post) => post.id);
   const trending = await getTrendingPosts(5, shownIds);
 
-  const showcaseSections = categoryTree
-    .map((category) => {
-      const childSlugs = category.children.map((c: Category) => c.slug);
-      const categoryPosts = remainingPosts
-        .filter((post) => post.category?.slug === category.slug || (post.category && childSlugs.includes(post.category.slug)))
-        .slice(0, 5);
-      return { category, posts: categoryPosts };
-    })
-    .filter((section) => section.posts.length >= 2)
-    .slice(0, 4);
+  // Each top-level category gets its OWN independent WordPress fetch
+  // (descendant/child-category posts folded in via getDescendantCategoryIds,
+  // same as the category listing page itself) — rather than being filtered
+  // out of whatever's "left over" after hero/sidebar/current already
+  // consumed the first ~14 posts. That leftover-pool approach meant a
+  // category with real content sitewide could still show zero posts here
+  // just because none of its posts happened to land past index 14 in the
+  // homepage's own recency-sorted feed — the smaller the site's total post
+  // count, the more likely that was to hide category sections entirely.
+  // Threshold is >=1 post (not >=2): a category with a single real post is
+  // still a real section, never a fabricated one.
+  const categorySectionsEnglish = (
+    await Promise.all(
+      categoryTree.map(async (category) => {
+        const categoryIds = getDescendantCategoryIds(category.id, categoryTree);
+        const { items } = await getPosts({ categoryIds, perPage: POSTS_PER_CATEGORY_SECTION });
+        return { category, posts: items };
+      })
+    )
+  )
+    .filter((section) => section.posts.length > 0)
+    .slice(0, MAX_CATEGORY_SECTIONS);
 
-  const spotlightSection = showcaseSections.length > 0 ? showcaseSections[0] : null;
-  const restShowcaseSections = showcaseSections.slice(1);
+  const categorySections = (
+    await Promise.all(
+      categorySectionsEnglish.map(async (section) => ({
+        category: section.category,
+        posts: await getTranslatedPostSummaries(section.posts, locale),
+      }))
+    )
+  ).filter((section) => section.posts.length > 0); // a translation-filtered section can end up empty for a non-English locale even though its English posts weren't
+
+  // The richest section (most posts) gets CategorySpotlight's premium
+  // treatment; every other one gets the standard CategoryShowcase — so the
+  // flagship slot always reflects which category actually has the most
+  // content right now, not just whichever came first in categoryTree order.
+  const spotlightIndex =
+    categorySections.length > 0
+      ? categorySections.reduce(
+          (bestIndex, section, index) => (section.posts.length > categorySections[bestIndex].posts.length ? index : bestIndex),
+          0
+        )
+      : -1;
+
+  const spotlightSection = spotlightIndex !== -1 ? categorySections[spotlightIndex] : null;
+  const restShowcaseSections = categorySections.filter((_, index) => index !== spotlightIndex);
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8">

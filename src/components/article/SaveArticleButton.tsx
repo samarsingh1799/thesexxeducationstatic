@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { FaRegBookmark, FaBookmark } from "react-icons/fa6";
 import { authClient } from "@/lib/auth/client";
+import { buildAuthModalUrl } from "@/lib/auth/authModal";
 
 type Props = {
   postId: number;
@@ -20,9 +21,9 @@ type Props = {
  * never varies per viewer (see app/api/bookmarks/[postId]/route.ts for
  * why this never touches the Next.js cache either).
  *
- * Renders for guests too (rather than hiding entirely) — clicking sends
- * them to sign in with a redirect back to this article instead of just
- * disappearing the affordance.
+ * Renders for guests too (rather than hiding entirely) — clicking opens
+ * the sign-in modal in place, with a way back to this article once
+ * signed in, instead of just disappearing the affordance.
  */
 export function SaveArticleButton({ postId, slug, categorySlug, locale, title }: Props) {
   const { data: session, isPending } = authClient.useSession();
@@ -46,7 +47,7 @@ export function SaveArticleButton({ postId, slug, categorySlug, locale, title }:
 
   async function toggle() {
     if (!session) {
-      router.push(`/${locale}/login?redirect=${encodeURIComponent(`/${locale}/${categorySlug ?? "article"}/${slug}`)}`);
+      router.push(buildAuthModalUrl(`/${locale}/${categorySlug ?? "article"}/${slug}`, "save"), { scroll: false });
       return;
     }
 

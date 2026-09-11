@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
-import { getAuthorBySlug } from "@/lib/wordpress/authors";
 import { getPosts } from "@/lib/wordpress/posts";
 import { getTranslatedPostSummaries } from "@/lib/wordpress/languages";
 import { getDictionary } from "@/lib/i18n/dictionary";
@@ -16,10 +14,16 @@ import { PaginatedPostGrid } from "@/components/article/PaginatedPostGrid";
 import { PostGrid } from "@/components/article/PostGrid";
 import { Pagination } from "@/components/ui/Pagination";
 import { PaginationNav } from "@/components/ui/PaginationNav";
+import { AdSlot } from "@/components/ads/AdSlot";
 
-// On-demand ISR — see app/[locale]/category/[slug]/page.tsx's comment for
-// why `searchParams` is never read here (pagination is handled client-side
-// by PaginatedPostGrid instead).
+// Same archive pattern as category/[slug]/page.tsx (breadcrumb, hero + grid,
+// pagination), just without a category filter — every published post,
+// reverse-chronological. On-demand ISR: page 1 is rendered and cached at
+// the edge, invalidated only by the WordPress webhook (`postsList`/
+// `sitemap` tags cover it — see lib/wordpress/posts.ts#getPosts and
+// api/revalidate/route.ts). `searchParams` is deliberately never read
+// here — pagination beyond page 1 is handled client-side by
+// PaginatedPostGrid, exactly like category/tag/author.
 export const revalidate = false;
 export const dynamicParams = true;
 
@@ -27,41 +31,34 @@ export async function generateStaticParams() {
   return [];
 }
 
-const PER_PAGE = 12;
+const PER_PAGE = 13;
 
-type RouteParams = { params: Promise<{ locale: string; slug: string }> };
+type RouteParams = { params: Promise<{ locale: string }> };
 
 export async function generateMetadata({ params }: RouteParams): Promise<Metadata> {
-  const { locale, slug } = await params;
-  const author = await getAuthorBySlug(slug);
-  if (!author) return { title: "Author not found", robots: { index: false, follow: true } };
-
+  const { locale } = await params;
   const dictionary = await getDictionary();
   return buildPageMetadata({
-    title: author.name,
-    description: author.bio || dictionary.articlesByAuthor.replace("{author}", author.name),
-    path: `/${locale}/author/${slug}`,
-    translations: getTranslationUrls(`/author/${slug}`),
+    title: dictionary.latestTitle,
+    description: dictionary.latestDescription,
+    path: `/${locale}/latest`,
+    translations: getTranslationUrls("/latest"),
   });
 }
 
-export default async function AuthorPage({ params }: RouteParams) {
-  const { locale, slug } = await params;
-
+export default async function LatestPage({ params }: RouteParams) {
+  const { locale } = await params;
   if (!isSupportedLocale(locale)) notFound();
-
-  const author = await getAuthorBySlug(slug);
-  if (!author) notFound();
 
   const [dictionary, { items: englishPosts, totalPages }] = await Promise.all([
     getDictionary(),
-    getPosts({ authorId: author.id, page: 1, perPage: PER_PAGE }),
+    getPosts({ page: 1, perPage: PER_PAGE }),
   ]);
   const posts = await getTranslatedPostSummaries(englishPosts, locale);
 
   const breadcrumbItems = [
     { name: dictionary.home, href: `/${locale}` },
-    { name: author.name, href: `/${locale}/author/${slug}` },
+    { name: dictionary.latestBreadcrumb, href: `/${locale}/latest` },
   ];
 
   return (
@@ -69,44 +66,29 @@ export default async function AuthorPage({ params }: RouteParams) {
       <JsonLd data={getBreadcrumbSchema(breadcrumbItems)} />
       <Breadcrumbs items={breadcrumbItems} />
 
-      <div className="mt-4 flex items-center gap-4 border-b border-border pb-8">
-        {author.avatarUrl ? (
-          <Image
-            src={author.avatarUrl}
-            alt=""
-            width={72}
-            height={72}
-            className="h-18 w-18 rounded-full object-cover"
-          />
-        ) : (
-          <span className="flex h-18 w-18 items-center justify-center rounded-full bg-accent-soft text-xl font-bold text-accent-dark">
-            {author.name.slice(0, 2).toUpperCase()}
-          </span>
-        )}
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-ink-muted">Author</p>
-          <h1 className="mt-1 text-3xl font-bold text-ink md:text-4xl">{author.name}</h1>
-          {author.bio && <p className="mt-1 max-w-2xl text-ink-muted">{author.bio}</p>}
-        </div>
+      <div className="mt-4 border-b border-border pb-8">
+        <h1 className="text-3xl font-bold text-ink md:text-4xl">{dictionary.latestTitle}</h1>
+        <p className="mt-2 max-w-2xl text-ink-muted">{dictionary.latestDescription}</p>
       </div>
 
       {/* See category/[slug]/page.tsx's comment on why these need a Suspense
           boundary with a real (not null) fallback. */}
-      <Suspense fallback={<PostGrid items={posts} locale={locale} showHero={false} noArticlesLabel={dictionary.noArticles} />}>
+      <Suspense fallback={<PostGrid items={posts} locale={locale} showHero noArticlesLabel={dictionary.noArticles} />}>
         <PaginatedPostGrid
-          type="author"
-          slug={author.slug}
+          type="latest"
           locale={locale}
           initialItems={posts}
-          showHeroOnFirstPage={false}
+          showHeroOnFirstPage
           noArticlesLabel={dictionary.noArticles}
         />
       </Suspense>
 
+      <AdSlot slotId="latest" label="Advertisement" className="mt-10" />
+
       <Suspense
         fallback={
           <PaginationNav
-            basePath={`/${locale}/author/${author.slug}`}
+            basePath={`/${locale}/latest`}
             page={1}
             totalPages={totalPages}
             previousLabel={dictionary.previous}
@@ -116,7 +98,7 @@ export default async function AuthorPage({ params }: RouteParams) {
         }
       >
         <Pagination
-          basePath={`/${locale}/author/${author.slug}`}
+          basePath={`/${locale}/latest`}
           totalPages={totalPages}
           previousLabel={dictionary.previous}
           nextLabel={dictionary.next}
