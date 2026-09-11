@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
-import { cache } from "react";
+import { cache, Suspense } from "react";
 import { getTranslatedPost, getAvailableTranslationLocales, getTranslatedPostSummaries } from "@/lib/wordpress/languages";
 import { getRelatedPosts } from "@/lib/wordpress/posts";
 import { getTrendingPosts } from "@/lib/wordpress/trending";
@@ -200,21 +200,45 @@ export default async function ArticlePage({ params }: RouteParams) {
             </div>
           </section>
 
-          <CommentsSection
-            postId={post.id}
-            locale={locale}
-            articlePath={canonicalPath}
-            dictionary={{
-              comments: dictionary.comments,
-              noCommentsYet: dictionary.noCommentsYet,
-              signInToComment: dictionary.signInToComment,
-              signIn: dictionary.signIn,
-              writeCommentPlaceholder: dictionary.writeCommentPlaceholder,
-              postComment: dictionary.postComment,
-              postingComment: dictionary.postingComment,
-              commentError: dictionary.commentError,
-            }}
-          />
+          <section aria-labelledby="comments-heading" className="mt-12">
+            <div className="border-t border-border">
+              <div className="inline-block rounded-b-md bg-[#171717] px-5 py-1 shadow-sm">
+                <span id="comments-heading" className="text-[11px] font-bold tracking-[0.25em] text-white uppercase">
+                  {dictionary.comments}
+                </span>
+              </div>
+            </div>
+
+            {/* CommentsSection reads useSearchParams() (client-side, for the
+                post-sign-in "resume to comment box" behavior) — Next.js
+                requires a Suspense boundary around any such component on a
+                statically-prerendered route, or the whole route "bails out"
+                to client-side rendering, which fails outright under the
+                OpenNext/Cloudflare ISR path (see category/[slug]/page.tsx's
+                own comment for the same requirement). Unlike that route's
+                PaginatedPostGrid, there's no server-known comments data to
+                put in the fallback here — comments are client-fetched from
+                /api/comments/[postId] end to end (see CommentsSection's own
+                comment on why) — so a loading skeleton is the honest
+                fallback, not a hidden real one. */}
+            <Suspense fallback={<div aria-hidden="true" className="mt-6 h-16 animate-pulse rounded-md bg-gray-100" />}>
+              <CommentsSection
+                postId={post.id}
+                locale={locale}
+                articlePath={canonicalPath}
+                dictionary={{
+                  comments: dictionary.comments,
+                  noCommentsYet: dictionary.noCommentsYet,
+                  signInToComment: dictionary.signInToComment,
+                  signIn: dictionary.signIn,
+                  writeCommentPlaceholder: dictionary.writeCommentPlaceholder,
+                  postComment: dictionary.postComment,
+                  postingComment: dictionary.postingComment,
+                  commentError: dictionary.commentError,
+                }}
+              />
+            </Suspense>
+          </section>
         </article>
 
         {/* Right column: Sticky Trending Sidebar */}

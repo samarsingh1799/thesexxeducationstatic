@@ -43,6 +43,17 @@ function formatDate(iso: string, locale: string): string {
  * until an unrelated WordPress edit happens to revalidate the page. Same
  * reasoning, same fix shape, as SaveArticleButton/LikeArticleButton
  * (client-side state, session-aware, never part of the cached page).
+ *
+ * Renders only the list + form — deliberately NOT the "COMMENTS" section
+ * heading, which the article page renders itself as static, always-visible
+ * chrome. That split matters: this component reads `useSearchParams()`
+ * (for the post-sign-in "resume to comment box" behavior), which requires
+ * a <Suspense> boundary around it in the parent (see the article page's
+ * own comment on this) — and unlike PaginatedPostGrid's page-1 data, there
+ * is no server-known comments data to put in that Suspense fallback, so
+ * the fallback is honestly a loading skeleton. Keeping the heading outside
+ * this component means it's still in the cached HTML even while this part
+ * is loading/hydrating.
  */
 export function CommentsSection({ postId, locale, articlePath, dictionary }: Props) {
   const { data: session, isPending } = authClient.useSession();
@@ -117,15 +128,7 @@ export function CommentsSection({ postId, locale, articlePath, dictionary }: Pro
   }
 
   return (
-    <section aria-labelledby="comments-heading" className="mt-12">
-      <div className="border-t border-border">
-        <div className="inline-block rounded-b-md bg-[#171717] px-5 py-1 shadow-sm">
-          <span id="comments-heading" className="text-[11px] font-bold tracking-[0.25em] text-white uppercase">
-            {dictionary.comments}
-          </span>
-        </div>
-      </div>
-
+    <>
       {comments === null ? (
         <div aria-hidden="true" className="mt-6 h-16 animate-pulse rounded-md bg-gray-100" />
       ) : comments.length === 0 ? (
@@ -194,6 +197,6 @@ export function CommentsSection({ postId, locale, articlePath, dictionary }: Pro
           </form>
         )}
       </div>
-    </section>
+    </>
   );
 }
